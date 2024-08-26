@@ -45,7 +45,7 @@ router.post('/check', (req, res) => {
     const existingBookingsQuery = `
       SELECT time 
       FROM bookings 
-      WHERE court_id = ? AND date = ? AND status != 'canceled'
+      WHERE idcourts = ? AND date = ? AND status != 'canceled'
     `;
   
     db.query(existingBookingsQuery, [courtId, date], (err, results) => {
@@ -60,6 +60,8 @@ router.post('/check', (req, res) => {
       // Flatten booked time slots into an array
       const bookedTimeSlots = results.flatMap(booking => booking.time.split(','));
   
+      console.log(bookedTimeSlots)
+
       // Check for conflicting slots
       const conflictingSlots = timeSlots.filter(slot => bookedTimeSlots.includes(slot));
   
@@ -73,14 +75,19 @@ router.post('/check', (req, res) => {
       }
   
       // If no conflicts, insert a temporary booking
+
+      const now = Date.now(); // Current time in milliseconds
+      const expiresAt = now + 5 * 60 * 1000; // Expiration time (5 minutes from now)
+  
+
       const newBooking = {
-        court_id: courtId,
+        idcourts: courtId,
         date: date, // Use the provided date directly
         time: timeSlots.join(','), // Join the array into a string for storage
         status: 'temporary', // Mark as temporary
-        user_id: userId, // Track the user making the booking
-        created_at: new Date(),
-        expires_at: new Date(Date.now() + 5 * 60 * 1000), // Set expiration time (5 minutes from now)
+        userId: userId, // Track the user making the booking
+        created_at:now,
+        expires_at: expiresAt, // Set expiration time (5 minutes from now)
       };
   
       db.query('INSERT INTO bookings SET ?', newBooking, (insertErr) => {
@@ -105,10 +112,10 @@ router.post('/check', (req, res) => {
   const handleTemporaryBookingExpiration = () => {
     const cleanupQuery = `
       DELETE FROM bookings 
-      WHERE status = 'temporary' AND expires_at < NOW()
+      WHERE status = 'temporary' AND expires_at < ?
     `;
   
-    db.query(cleanupQuery, (err) => {
+    db.query(cleanupQuery, [Date.now()], (err) => {
       if (err) {
         console.error('Error cleaning up expired temporary bookings:', err);
       }
