@@ -9,54 +9,17 @@ const { OAuth2Client } = require('google-auth-library');
 //const CLIENT_ID = "634317435388-f01paqk8lq0qtq8famopndvje333mkl0.apps.googleusercontent.com"
 const CLIENT_ID = "116733366795-93qtatkmuqm2d9p6l5n7m50lub50kq3c.apps.googleusercontent.com"
 const client = new OAuth2Client(CLIENT_ID);
+const auth = require("../../middleware/auth");
 
-router.post("/schools", (req, res) => {
+
+router.post("/users", (req, res) => {
   const email = req.body.email;
   const password = req.body.password;
 
-  db.query(
-    "SELECT contactpic,profilepic,biopic,videos,gold,diamond,elite,Likes,Όνομα,idschools,Coordinates,ExtraDances,Άλλα,Ενοικίαση,Κωδικός,Ιστοσελίδα,Email,ΔιαθέσιμηΑίθουσα,ΜέγεθοςΑίθουσας,image,ΑνώτερεςΣχολές,Διεύθυνση,Πτυχία,Τηλέφωνο,Περιοχή,Προάστια,Πόλη,ΤΚ,Χοροί,Κυριακή,Δευτέρα,Τρίτη,Τετάρτη,Πέμπτη,Παρασκευή,Σάββατο,Facebook,Instagram,Info,Πρόγραμμα,ProfileColors,FavoriteTeachers,FavoriteSchools,FavoriteOmades,ΠρόγραμμαΦώτο FROM schools WHERE Email=? AND Validated=1",
-    email,
-    (err, result) => {
-      if (err) {
-        res.send({ err: err });
-      }
-      console.log(result);
-      if (result.length > 0) {
-        bcrypt.compare(password, result[0].Κωδικός, (error, response) => {
-          if (response) {
-            const token = jwt.sign(
-              {
-                email: result[0].Email,
-                id: result[0].idschools,
-              },
-              process.env.JWT_SECRET,
-              {
-                expiresIn: "12h",
-              }
-            );
-            result[0].token = token;
-            result[0].Κωδικός = "";
-            loggersignin.log("info", "NewLogin School "+ 
-            JSON.stringify(result[0].Όνομα)+JSON.stringify(result[0].idschools));
-            res.send(result);
-          } else {
-            res.send({ message: "Δε βρέθηκε ο συνδυασμός" });
-          }
-        });
-      } else {
-        res.send({ message: "Δε βρέθηκε ο συνδυασμός" });
-      }
-    }
-  );
-});
 
-router.post("/teachers", (req, res) => {
-  const email = req.body.email;
-  const password = req.body.password;
 
   db.query(
-    "SELECT videos,gold,diamond,elite,Likes,Όνομα,id,Κωδικός,Ηλικία,Email,Performer,Άλλα,image,Επίθετο,Περιοχές,Πόλη,Προυπηρεσία,Πτυχία,Τηλέφωνο,Φύλο,Χοροί,Βιογραφικό,Κυριακή,Δευτέρα,Τρίτη,Τετάρτη,Πέμπτη,Παρασκευή,Σάββατο,Κωδικός,Ιστοσελίδα,Facebook,Instagram,Linkedin,ProfileColors,FavoriteTeachers,FavoriteSchools,FavoriteOmades,contactpic,profilepic,biopic FROM teachers WHERE Email=? AND Validated=1",
+    "SELECT * FROM users WHERE email=?",
     email,
     (err, result) => {
       if (err) {
@@ -64,13 +27,13 @@ router.post("/teachers", (req, res) => {
       }
 
       if (result.length > 0) {
-        bcrypt.compare(password, result[0].Κωδικός, (error, response) => {
+        bcrypt.compare(password, result[0].password, (error, response) => {
           if (response) {
             // req.session.user=result;
             const token = jwt.sign(
               {
-                email: result[0].Email,
-                id: result[0].id,
+                email: result[0].email,
+                id: result[0].idusers,
               },
               process.env.JWT_SECRET,
               {
@@ -78,10 +41,9 @@ router.post("/teachers", (req, res) => {
               }
             );
             result[0].token = token;
-            result[0].Κωδικός = "";
-            loggersignin.log("info", "NewLogin Teacher "+ 
-            JSON.stringify(result[0].Όνομα)+JSON.stringify(result[0].id));
+            result[0].password = "";
             res.send(result);
+         
           } else {
             res.send({ message: "Δε βρέθηκε ο συνδυασμός" });
           }
@@ -93,128 +55,24 @@ router.post("/teachers", (req, res) => {
   );
 });
 
-router.post("/visitors", (req, res) => {
-  const email = req.body.email;
-  const password = req.body.password;
+
+router.post("/users/autologin", auth, (req, res) => {
+
 
   db.query(
-    "SELECT  Βιογραφικό,Όνομα,Κωδικός,Επίθετο,Διεύθυνση,PostalCode,Περιοχή,Προάστια,Πόλη,Coordinates,Email,idvisitors,FavoriteSchools,FavoriteTeachers,FavoriteOmades,Instagram,Facebook,visible,Χοροί,image FROM visitors WHERE Email=? AND Validated=1",
-    email,
+    "SELECT * FROM users  WHERE email=? AND idusers=?",
+    [req.decoded.email, req.decoded.id],
     (err, result) => {
+      console.log(result[0])
       if (err) {
-        res.send({ err: err });
-      }
-      console.log(result);
-      if (result.length > 0) {
-        bcrypt.compare(password, result[0].Κωδικός, (error, response) => {
-          if (response) {
-            const token = jwt.sign(
-              {
-                email: result[0].Email,
-                id: result[0].idvisitors,
-              },
-              process.env.JWT_SECRET,
-              {
-                expiresIn: "240h",
-              }
-            );
-            result[0].token = token;
-            result[0].Κωδικός = "";
-            loggersignin.log("info", "NewLogin Visitor "+ 
-            JSON.stringify(result[0].Όνομα)+JSON.stringify(result[0].idvisitors));
-            res.send(result);
-          } else {
-            res.send({ message: "Δε βρέθηκε ο συνδυασμός" });
-          }
-        });
+        console.log(err);
       } else {
-        res.send({ message: "Δε βρέθηκε ο συνδυασμός" });
+        res.send(result[0]);
       }
     }
   );
 });
 
-router.post("/foreis", (req, res) => {
-  const email = req.body.email;
-  const password = req.body.password;
-
-  db.query(
-    "SELECT  * FROM foreis WHERE Email=? AND Validated=1",
-    email,
-    (err, result) => {
-      if (err) {
-        res.send({ err: err });
-      }
-      console.log(result);
-      if (result.length > 0) {
-        bcrypt.compare(password, result[0].Κωδικός, (error, response) => {
-          if (response) {
-            const token = jwt.sign(
-              {
-                email: result[0].Email,
-                id: result[0].idforeis,
-              },
-              process.env.JWT_SECRET,
-              {
-                expiresIn: "240h",
-              }
-            );
-            result[0].token = token;
-            result[0].Κωδικός = "";
-            loggersignin.log("info", "NewLogin Foreis "+ 
-            JSON.stringify(result[0].Όνομα)+JSON.stringify(result[0].idforeis));
-            res.send(result);
-          } else {
-            res.send({ message: "Δε βρέθηκε ο συνδυασμός" });
-          }
-        });
-      } else {
-        res.send({ message: "Δε βρέθηκε ο συνδυασμός" });
-      }
-    }
-  );
-});
-
-router.post("/omades", (req, res) => {
-  const email = req.body.email;
-  const password = req.body.password;
-
-  db.query(
-    "SELECT  * FROM omades WHERE Email=? AND Validated=1",
-    email,
-    (err, result) => {
-      if (err) {
-        res.send({ err: err });
-      }
-      console.log(result);
-      if (result.length > 0) {
-        bcrypt.compare(password, result[0].Κωδικός, (error, response) => {
-          if (response) {
-            const token = jwt.sign(
-              {
-                email: result[0].Email,
-                id: result[0].idomad,
-              },
-              process.env.JWT_SECRET,
-              {
-                expiresIn: "240h",
-              }
-            );
-            result[0].token = token;
-            result[0].Κωδικός = "";
-            loggersignin.log("info", "NewLogin Omada "+ 
-            JSON.stringify(result[0].Όνομα)+JSON.stringify(result[0].idomad));
-            res.send(result);
-          } else {
-            res.send({ message: "Δε βρέθηκε ο συνδυασμός" });
-          }
-        });
-      } else {
-        res.send({ message: "Δε βρέθηκε ο συνδυασμός" });
-      }
-    }
-  );
-});
 
 
 router.post("/resetpassword", (req, res) => {
@@ -321,188 +179,6 @@ router.post("/google/teachers", (req, res) => {
 });
 
 
-router.post("/google/schools", (req, res) => {
-
-  let token= req.body.token.credential;
-  
-  async function verify() {
-      try {
-  const ticket = await client.verifyIdToken({
-              idToken: token,
-              audience: CLIENT_ID, 
-          });
-          const payload = ticket.getPayload();
-         // const userid = payload['sub'];
-          let email=payload.email;
-          db.query(
-            "SELECT Likes,Όνομα,idschools,Coordinates,ExtraDances,Άλλα,Ενοικίαση,Κωδικός,Ιστοσελίδα,Email,ΔιαθέσιμηΑίθουσα,ΜέγεθοςΑίθουσας,image,ΑνώτερεςΣχολές,Διεύθυνση,Πτυχία,Τηλέφωνο,Περιοχή,Προάστια,Πόλη,ΤΚ,Χοροί,Κυριακή,Δευτέρα,Τρίτη,Τετάρτη,Πέμπτη,Παρασκευή,Σάββατο,Facebook,Instagram,Info,Πρόγραμμα,ProfileColors,FavoriteTeachers,FavoriteSchools,FavoriteOmades,ΠρόγραμμαΦώτο FROM schools WHERE Email=? AND Validated=1",
-            email,
-            (err, result) => {
-              if (err) {
-                res.send({ err: err });
-              }
-        
-              if (result.length > 0) {
-                const token = jwt.sign(
-                  {
-                    email: result[0].Email,
-                    id: result[0].idschools,
-                  },
-                  process.env.JWT_SECRET,
-                  {
-                    expiresIn: "240h",
-                  }
-                );
-                result[0].token = token;
-                result[0].Κωδικός = "";
-                loggersignin.log("info", "NewLogin School "+ 
-                JSON.stringify(result[0].Όνομα)+JSON.stringify(result[0].idschools));
-                res.send(result);
-              } else {
-                res.send({ message: "Δε βρέθηκε ο συνδυασμός" });
-              }
-            }
-          );
-
-
-
-
-      } catch (error) {
-          console.log(error);
-          res.send({ message: "Δε βρέθηκε ο συνδυασμός" });
-      }
-  }
-  verify()
-
-});
-
-
-router.post("/google/visitors", (req, res) => {
-
-  let token= req.body.token.credential;
- 
-  async function verify() {
-      try {
-  const ticket = await client.verifyIdToken({
-              idToken: token,
-              audience: CLIENT_ID, 
-          });
-          const payload = ticket.getPayload();
-         // const userid = payload['sub'];
-          let email=payload.email;
-          db.query(
-            "SELECT  Όνομα,Κωδικός,Επίθετο,Διεύθυνση,PostalCode,Περιοχή,Προάστια,Πόλη,Coordinates,Email,idvisitors,FavoriteSchools,FavoriteTeachers,FavoriteOmades,Instagram,Facebook,visible,Χοροί,image FROM visitors WHERE Email=? AND Validated=1",
-            email,
-            (err, result) => {
-              if (err) {
-                res.send({ err: err });
-              }
-        
-              if (result.length > 0) {
-                const token = jwt.sign(
-                  {
-                    email: result[0].Email,
-                    id: result[0].idvisitors,
-                  },
-                  process.env.JWT_SECRET,
-                  {
-                    expiresIn: "240h",
-                  }
-                );
-                result[0].token = token;
-                result[0].Κωδικός = "";
-                loggersignin.log("info", "NewLogin Visitor "+ 
-                JSON.stringify(result[0].Όνομα)+JSON.stringify(result[0].idvisitors));
-                res.send(result);
-              } else {
-                res.send({ message: "Δε βρέθηκε ο συνδυασμός" });
-              }
-            }
-          );
-
-
-
-
-      } catch (error) {
-          console.log(error);
-          res.send({ message: "Δε βρέθηκε ο συνδυασμός" });
-      }
-  }
-  verify()
-
-});
-
-
-router.post("/google/foreis", (req, res) => {
-
-  let token= req.body.token.credential;
-  
-  async function verify() {
-      try {
-  const ticket = await client.verifyIdToken({
-              idToken: token,
-              audience: CLIENT_ID, 
-          });
-          const payload = ticket.getPayload();
-         // const userid = payload['sub'];
-          let email=payload.email;
-          db.query(
-            "SELECT  * FROM foreis WHERE Email=? AND Validated=1",
-    email,
-            (err, result) => {
-              if (err) {
-                res.send({ err: err });
-              }
-        
-              if (result.length > 0) {
-                const token = jwt.sign(
-                  {
-                    email: result[0].Email,
-                    id: result[0].idforeis,
-                  },
-                  process.env.JWT_SECRET,
-                  {
-                    expiresIn: "240h",
-                  }
-                );
-                result[0].token = token;
-                result[0].Κωδικός = "";
-                loggersignin.log("info", "NewLogin Visitor "+ 
-                JSON.stringify(result[0].Όνομα)+JSON.stringify(result[0].idforeis));
-                res.send(result);
-              } else {
-                res.send({ message: "Δε βρέθηκε ο συνδυασμός" });
-              }
-            }
-          );
-
-
-
-
-      } catch (error) {
-          console.log(error);
-          res.send({ message: "Δε βρέθηκε ο συνδυασμός" });
-      }
-  }
-  verify()
-
-});
-
-
-
-
-
-
-
-// router.get("/:type/:hashedEmail", async (req, res) => {
-//   const hashedEmail = req.params.hashedEmail;
-//   const type=req.params.type;
-
-//   const Email = jwt.verify(hashedEmail, process.env.JWT_SECRET_MAIL);
-
-// console.log(Email);
-
-// });
 
 router.post("/newpassword", (req, res) => {
   const token = req.body.token;

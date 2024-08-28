@@ -60,7 +60,7 @@ router.post('/check', (req, res) => {
       // Flatten booked time slots into an array
       const bookedTimeSlots = results.flatMap(booking => booking.time.split(','));
   
-      console.log(bookedTimeSlots)
+     
 
       // Check for conflicting slots
       const conflictingSlots = timeSlots.filter(slot => bookedTimeSlots.includes(slot));

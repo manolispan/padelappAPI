@@ -32,7 +32,7 @@ app.use(speedLimiter); */
 
 
 
-const teachersRoutes=require('./api/routes/teachers');
+const teachersRoutes=require('./api/routes/users');
 const autologinRoutes=require('./api/routes/autologin');
 const emailverify=require('./api/routes/emailverify');
 const loginRoutes=require('./api/routes/login');
@@ -59,7 +59,7 @@ app.use(cookieParser());
 
 app.use(bodyParser.urlencoded({extended:true}));
 
-app.use('/teachers',teachersRoutes);
+app.use('/users',teachersRoutes);
 app.use('/login',loginRoutes);
 app.use('/autologin',autologinRoutes);
 app.use('/emailverify',emailverify);

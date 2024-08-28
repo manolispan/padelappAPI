@@ -6,9 +6,9 @@ const sharp=require('sharp');
 const fs = require('fs');
 const db=require('../../database/db.js')
 const jwt = require("jsonwebtoken");
-const transport= require('../../nodemailer/nodemailertrans');
-const auth = require("../../middleware/auth");
-const logger =require("../../winston/logger");
+const transport= require('../../nodemailer/nodemailertrans.js');
+const auth = require("../../middleware/auth.js");
+const logger =require("../../winston/logger.js");
 
 
 const storage = multer.diskStorage({
@@ -61,226 +61,43 @@ const upload = multer({
 
 });
 
+ 
 
-router.get("/coaches", (req, res) => {
-  db.query("SELECT * FROM coaches",(err,result)=>{
-  if (err) {
-      console.log(err)    }
-      else { 
-          res.send(result)
-      }}
-  )
-})
+ 
 
+  router.post("/register", (req, res) => {
+   
+ 
 
-
-
-  router.post("/", (req, res) => {
-    const Όνομα = req.body.Όνομα;
-    const Ηλικία = req.body.Ηλικία;
-    const Email = req.body.Email;
-    const Κωδικός=req.body.Κωδικός;
-    const Επίθετο = req.body.Επίθετο;
-    const Performer = req.body.Performer;
-    const image = req.body.image;
-    const Περιοχές = req.body.Περιοχές.join(',');
-    const Πόλη = req.body.Πόλη;
-    const Τηλέφωνο = req.body.Τηλέφωνο;
-    const Προυπηρεσία= req.body.Προυπηρεσία;
-    const Φύλο = req.body.Φύλο;
-    const Χοροί = req.body.Χοροί.join(',');
-    const Βιογραφικό= req.body.Βιογραφικό;
-    const Πτυχία=req.body.Πτυχία.join(',');
-    const Ιστοσελίδα=req.body.Ιστοσελίδα;
-    const Facebook=req.body.Facebook;
-    const Instagram=req.body.Ιnstagram;
-    const Linkedin=req.body.Linkedin;
-    const ΗμερομηνίαΕγγραφής = Date.now();
-    const Τροποποίηση = Date.now();
-
-    logger.log("info", "memberinfo"+ 
-    JSON.stringify(req.body));
+    const password = req.body.password;
+    const email = req.body.email;
+    const name = req.body.name;
+    const address = req.body.address;
+    const photo = req.body.photo;
+    const phone = req.body.phone;
+    const position = req.body.position;
+    const age = req.body.age;
+    const gender = req.body.gender
+    const registered_at = Date.now();
 
 
-    const Κυριακή2 = [];
-    const Δευτέρα2 = [];
-    const Τρίτη2 = [];
-    const Τετάρτη2 = [];
-    const Πέμπτη2 = [];
-    const Παρασκευή2 = [];
-    const Σάββατο2 = [];
-    
-  
-    for (const [key, value] of Object.entries(req.body.Διαθεσιμότητα.Κυριακή)) {
-      if (value === true) {
-       Κυριακή2.push(key);
-      }
-    }
-  
-    for (const [key, value] of Object.entries(req.body.Διαθεσιμότητα.Δευτέρα)) {
-      if (value === true) {
-        Δευτέρα2.push(key);
-      }
-    }
-  
-    for (const [key, value] of Object.entries(req.body.Διαθεσιμότητα.Τρίτη)) {
-      if (value === true) {
-        Τρίτη2.push(key);
-      }
-    }
-    for (const [key, value] of Object.entries(req.body.Διαθεσιμότητα.Τετάρτη)) {
-      if (value === true) {
-        Τετάρτη2.push(key);
-      }
-    }
-  
-    for (const [key, value] of Object.entries(req.body.Διαθεσιμότητα.Πέμπτη)) {
-      if (value === true) {
-        Πέμπτη2.push(key);
-      }
-    }
-  
-    for (const [key, value] of Object.entries(req.body.Διαθεσιμότητα.Παρασκευή)) {
-      if (value === true) {
-        Παρασκευή2.push(key);
-      }
-    }
-  
-    for (const [key, value] of Object.entries(req.body.Διαθεσιμότητα.Σάββατο)) {
-      if (value === true) {
-        Σάββατο2.push(key);
-      }
-    }
-  
-    const Κυριακή=Κυριακή2.join(',');
-      
-    
-  
-  const Δευτέρα=Δευτέρα2.join(',');
-  
-  
-   const Τρίτη=Τρίτη2.join(',');
-  
-  const Τετάρτη=Τετάρτη2.join(',');
-  
-   const Πέμπτη=Πέμπτη2.join(',');
-  
-  const Παρασκευή=Παρασκευή2.join(',');
-  
-  const Σάββατο=Σάββατο2.join(',');
 
-  const ValidateMail= jwt.sign({email: Email}, process.env.JWT_SECRET_MAIL);
-
-//edw comment out to Validate Email + Ebala sto database na bgazei automata 1
-/*   
-
-  transport.sendMail({
-    from: `"Manos Pan" ${process.env.USE_MAIL}`,
-    to: Email,
-    subject: "Επιβεβαίωση Εγγραφής",
-    html: `
-    <html>
-    <head>
-  <title>Επιβεβαίωση Εγγραφής</title>
-</head>
-    <body>
-    <h1>Επιβεβαίωση Email</h1>
-        <h2>Καλωσήρθες ${Όνομα}</h2>
-        <p>Ευχαριστούμε για την εγγραφή! Παρακαλώ επιβεβαιώστε το email σας πατώντας τον παρακάτω σύνδεσμο</p>
-        <a href=${process.env.THIS_DOMAIN}emailverify/teachers/${ValidateMail}> Πατήστε Εδώ</a>
-        </body></html>`,
-    text: `Επιβεβαίωση Εγγραφής
-Επιβεβαίωση Email
- Καλωσήρθες ${Όνομα}
-       Ευχαριστούμε για την εγγραφή! Παρακαλώ επιβεβαιώστε το email σας πατώντας τον παρακάτω σύνδεσμο
-         Πατήστε Εδώ`,
-  }).catch(err => console.log(err)); */
-
-//telos edw
-
-
-//eidopoihsh se mena oti kapoios grafthke
-
-/* transport.sendMail({
-  from: `"Manos Pan" ${process.env.USE_MAIL}`,
-  to: `"Manos Pan" ${process.env.USE_MAIL}`,
-  subject: "Νέα Εγγραφή Δασκάλου",
-  html: `
-  <html>
-  <head>
-<title>Νέα Εγγραφή Δασκάλου</title>
-</head>
-  <body>
-  <h1>Επιβεβαίωση Email</h1>
-      <h2>Νέα Εγγραφή Δασκάλου!! ${Όνομα} ${Επίθετο}</h2>
-      </body></html>`,
-  text: `Νέα Εγγραφή Δασκάλου
-  Νέο Μέλος  ${Όνομα} ${Επίθετο}`,
-}).catch(err => console.log(err)); */
-
-//
-
-
-//euxarustw gia thn eggrafh
-
-transport.sendMail({
-  from: `"DanceLink" ${process.env.USE_MAIL}`,
-  to: [Email, process.env.USE_MAIL],
-  subject: "Εγγραφή στο dancelink.gr",
-  html: `
-  <html>
-  <head>
-<title>Επιτυχής Εγγραφή</title>
-</head>
-  <body>
-  <img  src="https://www.dancelink.gr/photos/profilephoto.png"  
-  alt="dancelink logo"
-  style="width: 240px;
-  height: 240px;
-  object-fit: cover;
-  object-position: center;"
-  />
-  <h2 style="color:blue;">Επιτυχής Εγγραφή Δασκάλου</h2>
-      <h3>Καλωσήρθες <strong>${Όνομα}</strong>,</h3>
-      <div>Ευχαριστούμε για την εγγραφή!</div>
-      <div>Μπορείς να επεξεργαστείς το προφίλ σου αλλάζοντας ή προσθέτοντας νέα στοιχεία
-      όποτε θελήσεις, απλά κάνοντας είσοδο με το λογαριασμό σου.
-      </div>
-      <div>Γι αυτό το λόγο είναι σημαντικό να μη χάσεις τον κωδικό που έβαλες κατά την εγγραφή!</div>
-      <div>
-      Σε περίπτωση που τον ξεχάσεις, μπορείς να πατήσεις "ξέχασα τον κωδικό μου" μεσα απο την ιστοσελίδα 
-      του <a href="www.dancelink.gr">dancelink.gr<a/>.
-      </div>
-      <div> Σε περίπτωση που η εγγραφή δεν έγινε από εσάς παρακαλώ επικοινωνήστε μαζί μας, 
-      απαντώντας σε αυτό το email.</div>
-      
-      </body></html>`,
-  text: `Εγγραφή στο dancelink.gr
-  Επιτυχής Εγγραφή Δασκάλου
-Καλωσήρθες ${Όνομα}
-     Ευχαριστούμε για την εγγραφή!`,
-}).catch(err => {console.log(err);
-  logger.log("error", "error in mail"+ JSON.stringify(error));
-});
-
-//
 
 
   
-  bcrypt.hash(Κωδικός,parseInt(process.env.BCRYPT_SALTROUNDS), (err,hash)=>
+  bcrypt.hash(password,parseInt(process.env.BCRYPT_SALTROUNDS), 
+  (err,hash)=>
   {if (err) { console.log(err);
-    logger.log("error", "error in passhash"+ JSON.stringify(error));
+   
   }  
     db.query(
         
-      "INSERT INTO teachers (Τροποποίηση,Πόλη,ΗμερομηνίαΕγγραφής,Όνομα,Ηλικία,Email,Performer,image,Επίθετο,Περιοχές,Προυπηρεσία,Πτυχία,Τηλέφωνο,Φύλο,Χοροί,Βιογραφικό,Κυριακή,Δευτέρα,Τρίτη,Τετάρτη,Πέμπτη,Παρασκευή,Σάββατο,Κωδικός,Ιστοσελίδα,Facebook,Instagram,Linkedin,ValidateMail) VALUES  (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-      [Τροποποίηση,Πόλη,ΗμερομηνίαΕγγραφής,Όνομα,Ηλικία,Email,Performer,image,Επίθετο,Περιοχές,Προυπηρεσία,Πτυχία,Τηλέφωνο,Φύλο,Χοροί,Βιογραφικό,
-          Κυριακή,Δευτέρα,Τρίτη,Τετάρτη,Πέμπτη,Παρασκευή,Σάββατο,hash,Ιστοσελίδα,Facebook,Instagram,Linkedin,ValidateMail],
+      "INSERT INTO users (gender,password,email,name,address,phone,photo,position,age,registered_at) VALUES  (?,?,?,?,?,?,?,?,?,?)",
+      [gender,hash,email,name,address,phone,photo,position,age,registered_at],
       (err, result) => {
           /* console.log(req.body); */
-        if (err) {
+        if (err) { 
           console.log(err);
-          logger.log("error", "error in SQL"+ JSON.stringify(err));
         } else {
           res.send(result.insertId.toString());
           
