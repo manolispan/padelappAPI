@@ -167,6 +167,46 @@ const upload = multer({
   
 
 
+  router.get('/user/:userId', (req, res) => {
+    const { userId } = req.params;
+  
+    const query = 'SELECT photo FROM users WHERE idusers = ?';
+    db.query(query, [userId], (err, results) => {
+      if (err) {
+        console.error('Error fetching user:', err);
+        return res.status(500).json({ error: 'Database query failed' });
+      }
+  
+      if (results.length === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+  
+      res.json(results[0]); // Send the user's photo as JSON
+    });
+  });
+
+
+
+
+
+
+
+
+
+
+  router.get("/", (req, res) => {
+    db.query("SELECT videos,gold,diamond,elite,Likes,Όνομα,Τροποποίηση,ΗμερομηνίαΕγγραφής,image,Πόλη,Επίθετο,Ηλικία,Άλλα,Φύλο,Περιοχές,Πτυχία,Χοροί,id,Κυριακή,Δευτέρα,Τρίτη,Τετάρτη,Πέμπτη,Παρασκευή,Σάββατο,Προυπηρεσία,Performer,ProfileColors,id,profilepic,contactpic,biopic FROM teachers WHERE VALIDATED=1",(err,result)=>{
+    if (err) {
+        console.log(err)    }
+        else { 
+            res.send(result)
+        }}
+    )
+})
+
+
+
+
 
   router.get("/", (req, res) => {
     db.query("SELECT videos,gold,diamond,elite,Likes,Όνομα,Τροποποίηση,ΗμερομηνίαΕγγραφής,image,Πόλη,Επίθετο,Ηλικία,Άλλα,Φύλο,Περιοχές,Πτυχία,Χοροί,id,Κυριακή,Δευτέρα,Τρίτη,Τετάρτη,Πέμπτη,Παρασκευή,Σάββατο,Προυπηρεσία,Performer,ProfileColors,id,profilepic,contactpic,biopic FROM teachers WHERE VALIDATED=1",(err,result)=>{

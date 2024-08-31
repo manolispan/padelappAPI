@@ -124,7 +124,7 @@ router.post('/finalcheck', auth, (req, res) => {
     team_a_player_a_name,team_a_player_b_name,team_b_player_a_name,team_b_player_b_name,
     team_a_player_a_surname,team_a_player_b_surname,team_b_player_a_surname,team_b_player_b_surname,
     team_a_player_a_added_by,team_a_player_b_added_by,team_b_player_a_added_by,team_b_player_b_added_by,
-    rated,typeOfBooking
+    rated,typeOfBooking,level,indoor,court_name
   } = req.body;
 
 
@@ -195,6 +195,9 @@ router.post('/finalcheck', auth, (req, res) => {
       team_b_player_a_added_by : team_b_player_a_added_by,
       team_b_player_b_added_by : team_b_player_b_added_by,
       rated : rated,
+      level : level,
+      indoor : indoor,
+      court_name : court_name,
       typeOfBooking : typeOfBooking
 
     };
@@ -216,6 +219,95 @@ router.post('/finalcheck', auth, (req, res) => {
     });
   });
 });
+
+
+// Get All or Future Bookings with Optional Pagination
+router.get("/", (req, res) => {
+  const { future, status, userId, courtId, page, limit,sort, typeOfBooking, rated,date  } = req.query;
+
+  // Base query
+  let query = `SELECT * FROM bookings`;
+  const queryParams = [];
+
+  // If 'future' query parameter is set to 'true', filter for future bookings
+  if (future === 'true') {
+    const tempDate = new Date();
+    tempDate.setMinutes(tempDate.getMinutes() - tempDate.getTimezoneOffset());
+    const formattedDate = tempDate.toISOString().split('T')[0];
+    query += ` WHERE date >= ?`;
+    queryParams.push(formattedDate);
+  }
+
+  // Add optional filters
+  if (status) {
+    query += future === 'true' ? ` AND` : ` WHERE`;
+    query += ` status = ?`;
+    queryParams.push(status);
+  }
+
+  if (userId) {
+    query += future === 'true' || status ? ` AND` : ` WHERE`;
+    query += ` userId = ?`;
+    queryParams.push(userId);
+  }
+
+  if (courtId) {
+    query += future === 'true' || status || userId ? ` AND` : ` WHERE`;
+    query += ` idcourts = ?`;
+    queryParams.push(courtId);
+  }
+
+ // Optional typeOfBooking filter
+ if (typeOfBooking && typeOfBooking.trim() !== "") {
+  query += future === 'true' || status || userId || courtId ? ` AND` : ` WHERE`;
+  query += ` typeOfBooking = ?`;
+  queryParams.push(typeOfBooking);
+}
+
+// Optional rated filter
+if (rated && typeof date !== 'undefined' && rated.trim() !== "") {
+  query += future === 'true' || status || userId || courtId || (typeOfBooking) ? ` AND` : ` WHERE`;
+  query += ` rated = ?`;
+  queryParams.push(rated);
+}
+
+  // Optional date filter
+  if (date && typeof date !== 'undefined' && date.trim() != "") {
+    query += future === 'true' || status || userId || courtId || typeOfBooking || rated ? ` AND` : ` WHERE`;
+    query += ` date = ?`;
+    queryParams.push(date);
+  }
+
+  // Exclude bookings with status 'temporary'
+  query += future === 'true' || status || userId || courtId || typeOfBooking || rated || date ? ` AND` : ` WHERE`;
+  query += ` status <> 'temporary'`;
+
+  // Optional sorting logic
+  if (sort && sort === 'recent') {
+    query += ` ORDER BY date DESC, TIME(LEFT(time, INSTR(time, '-') - 1)) DESC`; // Sort by most recent
+  } else if (sort && sort === 'oldest') {
+    query += ` ORDER BY date ASC, TIME(LEFT(time, INSTR(time, '-') - 1)) ASC`; // Sort by oldest
+  }
+
+
+  // Optional pagination logic
+  if (limit) {
+    const offset = (page ? (page - 1) * limit : 0); // Default offset to 0 if page is not provided
+    query += ` LIMIT ? OFFSET ?`;
+    queryParams.push(parseInt(limit), offset);
+  }
+
+  // Execute the query
+  db.query(query, queryParams, (err, results) => {
+    if (err) {
+      console.error('Error fetching bookings:', err);
+      return res.status(500).json({ error: 'Database query failed' });
+    }
+
+    res.json(results); // Send the results as JSON
+  });
+});
+
 
   
   // Temporary booking expiration handler (e.g., a background job or cron job)
