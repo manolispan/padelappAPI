@@ -40,6 +40,8 @@ const loginRoutes=require('./api/routes/login');
 const coachesRoutes=require('./api/routes/coaches');
 const courtsRoutes=require('./api/routes/courts');
 const bookingsRoutes=require('./api/routes/bookings');
+const rankingsRoutes=require('./api/routes/rankings');
+const optionsRoutes = require('./api/routes/options')
 
 
 app.use(cors({
@@ -66,6 +68,8 @@ app.use('/emailverify',emailverify);
 app.use('/coaches',coachesRoutes);
 app.use('/courts',courtsRoutes);
 app.use('/bookings', bookingsRoutes);
+app.use('/rankings',rankingsRoutes);
+app.use('/options',optionsRoutes);
 
 
 

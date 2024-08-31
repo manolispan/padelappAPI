@@ -13,8 +13,9 @@ const logger =require("../../winston/logger");
 
 
 
-router.get("/", (req, res) => {
+router.post("/", auth, (req, res) => {
     const { date, idcourts } = req.query;
+
   
     // Validate query parameters
     if (!date || !idcourts) {
@@ -25,9 +26,9 @@ router.get("/", (req, res) => {
     const query = `
       SELECT *
       FROM bookings
-      WHERE date = ? AND idcourts = ?`;
+      WHERE date = ? AND idcourts = ?  AND NOT (status = 'temporary' AND userId = ?)`;
   
-    db.query(query, [date, idcourts], (err, results) => {
+    db.query(query, [date, idcourts,req.decoded.id], (err, results) => {
       if (err) {
         console.error('Error fetching bookings:', err);
         return res.status(500).json({ error: 'Database query failed' });
@@ -38,17 +39,21 @@ router.get("/", (req, res) => {
   });
 
 // Route to check and temporarily book slots
-router.post('/check', (req, res) => {
-    const { date, courtId, timeSlots, userId } = req.body;
+router.post('/check', auth, (req, res) => {
+    const { date, courtId, timeSlots, userId,status } = req.body;
+
+ 
+    let newStatus = ""
+    if (status) {newStatus=status};
   
     // Check for existing bookings
     const existingBookingsQuery = `
       SELECT time 
       FROM bookings 
-      WHERE idcourts = ? AND date = ? AND status != 'canceled'
+      WHERE idcourts = ? AND date = ? AND status != 'canceled' AND NOT (status = 'temporary' AND userId = ?)
     `;
   
-    db.query(existingBookingsQuery, [courtId, date], (err, results) => {
+    db.query(existingBookingsQuery, [courtId, date,req.decoded.id], (err, results) => {
       if (err) {
         console.error('Error querying existing bookings:', err);
         return res.status(500).json({
@@ -78,14 +83,17 @@ router.post('/check', (req, res) => {
 
       const now = Date.now(); // Current time in milliseconds
       const expiresAt = now + 5 * 60 * 1000; // Expiration time (5 minutes from now)
-  
+      const shortBookingId = - (now % 1000000); 
+
+
 
       const newBooking = {
+        idbookings: status == 'temporary' ? shortBookingId : null, // Use a negative value for temporary bookings
         idcourts: courtId,
         date: date, // Use the provided date directly
         time: timeSlots.join(','), // Join the array into a string for storage
-        status: 'temporary', // Mark as temporary
-        userId: userId, // Track the user making the booking
+        status: newStatus, // Mark as temporary
+        userId: req.decoded.id, // Track the user making the booking
         created_at:now,
         expires_at: expiresAt, // Set expiration time (5 minutes from now)
       };
@@ -107,6 +115,108 @@ router.post('/check', (req, res) => {
       });
     });
   });
+
+
+// Route to check and temporarily book slots
+router.post('/finalcheck', auth, (req, res) => {
+  const { date, courtId, timeSlots, userId,status,
+    team_a_player_a,team_a_player_b,team_b_player_a,team_b_player_b,
+    team_a_player_a_name,team_a_player_b_name,team_b_player_a_name,team_b_player_b_name,
+    team_a_player_a_surname,team_a_player_b_surname,team_b_player_a_surname,team_b_player_b_surname,
+    team_a_player_a_added_by,team_a_player_b_added_by,team_b_player_a_added_by,team_b_player_b_added_by,
+    rated,typeOfBooking
+  } = req.body;
+
+
+  let newStatus = ""
+  if (status) {newStatus=status};
+
+  // Check for existing bookings
+  const existingBookingsQuery = `
+    SELECT time 
+    FROM bookings 
+    WHERE idcourts = ? AND date = ? AND status != 'canceled' AND NOT (status = 'temporary' AND userId = ?)
+  `;
+
+  db.query(existingBookingsQuery, [courtId, date,req.decoded.id], (err, results) => {
+    if (err) {
+      console.error('Error querying existing bookings:', err);
+      return res.status(500).json({
+        success: false,
+        message: 'An error occurred while checking existing bookings.',
+      });
+    }
+
+    // Flatten booked time slots into an array
+    const bookedTimeSlots = results.flatMap(booking => booking.time.split(','));
+
+   
+
+    // Check for conflicting slots
+    const conflictingSlots = timeSlots.filter(slot => bookedTimeSlots.includes(slot));
+
+    if (conflictingSlots.length > 0) {
+      // Return conflicts
+      return res.status(409).json({
+        success: false,
+        message: 'Some of the selected slots are no longer available.',
+        conflictingSlots,
+      });
+    }
+
+    // If no conflicts, insert a temporary booking
+
+    const now = Date.now(); // Current time in milliseconds
+    const expiresAt = now + 5 * 60 * 1000; // Expiration time (5 minutes from now)
+
+
+    const newBooking = {
+         idcourts: courtId,
+      date: date, // Use the provided date directly
+      time: timeSlots.join(','), // Join the array into a string for storage
+      status: newStatus, // Mark as temporary
+      userId: req.decoded.id, // Track the user making the booking
+      created_at:now,
+      expires_at: "", // Set expiration time (5 minutes from now)
+      team_a_player_a : team_a_player_a,
+      team_a_player_b : team_a_player_b,
+      team_b_player_a : team_b_player_a,
+      team_b_player_b : team_b_player_b,
+      team_a_player_a_name : team_a_player_a_name,
+      team_a_player_b_name : team_a_player_b_name,
+      team_b_player_a_name : team_b_player_a_name,
+      team_b_player_b_name : team_b_player_b_name,
+      team_a_player_a_surname : team_a_player_a_surname,
+      team_a_player_b_surname : team_a_player_b_surname,
+      team_b_player_a_surname : team_b_player_a_surname,
+      team_b_player_b_surname : team_b_player_b_surname,
+      team_a_player_a_added_by : team_a_player_a_added_by,
+      team_a_player_b_added_by : team_a_player_b_added_by,
+      team_b_player_a_added_by : team_b_player_a_added_by,
+      team_b_player_b_added_by : team_b_player_b_added_by,
+      rated : rated,
+      typeOfBooking : typeOfBooking
+
+    };
+
+    db.query('INSERT INTO bookings SET ?', newBooking, (insertErr) => {
+      if (insertErr) {
+        console.error('Error inserting temporary booking:', insertErr);
+        return res.status(500).json({
+          success: false,
+          message: 'An error occurred while reserving the time slots.',
+        });
+      }
+
+      // Return success response
+      res.json({
+        success: true,
+        message: 'Time slots reserved temporarily.',
+      });
+    });
+  });
+});
+
   
   // Temporary booking expiration handler (e.g., a background job or cron job)
   const handleTemporaryBookingExpiration = () => {

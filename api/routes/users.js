@@ -42,6 +42,59 @@ const storage = multer.diskStorage({
   })
 
 
+  function greekToGreeklish(text) {
+    const greekChars = {
+      'α': 'a',
+      'ά': 'a',
+      'β': 'v',
+      'γ': 'g',
+      'δ': 'd',
+      'ε': 'e',
+      'έ': 'e',
+      'ζ': 'z',
+      'η': 'h',
+      'ή': 'h',
+      'θ': 'th',
+      'ι': 'i',
+      'ί': 'i',
+      'ΐ' : 'i',
+      'ϊ': 'i',
+      'κ': 'k',
+      'λ': 'l',
+      'μ': 'm',
+      'ν': 'n',
+      'ξ': 'x',
+      'ο': 'o',
+      'ό': 'o',
+      'π': 'p',
+      'ρ': 'r',
+      'σ': 's',
+      'ς': 's',
+      'τ': 't',
+      'υ': 'u',
+      'ύ': 'u',
+      'ϋ': 'u',
+      'ΰ' : 'u',
+      'φ': 'f',
+      'χ': 'x',
+      'ψ': 'ps',
+      'ω': 'o',
+      'ώ': 'o'
+    };
+  
+    let result = '';
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      if (greekChars[char.toLowerCase()]) {
+        result += greekChars[char.toLowerCase()];
+      } else {
+        result += char;
+      }
+    }
+  
+    return result;
+  }
+
 
 
 const fileFilter = (req, file, cb) => {
@@ -78,6 +131,7 @@ const upload = multer({
     const position = req.body.position;
     const age = req.body.age;
     const gender = req.body.gender
+    const surname = req.body.surname
     const registered_at = Date.now();
 
 
@@ -92,8 +146,8 @@ const upload = multer({
   }  
     db.query(
         
-      "INSERT INTO users (gender,password,email,name,address,phone,photo,position,age,registered_at) VALUES  (?,?,?,?,?,?,?,?,?,?)",
-      [gender,hash,email,name,address,phone,photo,position,age,registered_at],
+      "INSERT INTO users (surname,gender,password,email,name,address,phone,photo,position,age,registered_at) VALUES  (?,?,?,?,?,?,?,?,?,?,?)",
+      [surname,gender,hash,email,name,address,phone,photo,position,age,registered_at],
       (err, result) => {
           /* console.log(req.body); */
         if (err) { 
@@ -123,6 +177,31 @@ const upload = multer({
         }}
     )
 })
+
+router.get('/search', (req, res) => {
+  const searchQuery = req.query.search || '';
+  const minRanking = parseFloat(req.query.minRanking) || 1; // Default to 2.5 if not provided
+  const maxRanking = parseFloat(req.query.maxRanking) || 7; // Default to 4.0 if not provided
+  let searchQueryEn = "";
+  if (req.query.search && req.query.search!="") {
+    searchQueryEn = greekToGreeklish(req.query.search.toLowerCase().trim().replace(/  +/g, ' '))
+  }
+
+
+  const query = `
+      SELECT idusers, name, surname, photo, phone, address, position, age, registered_at, email, gender, ranking
+      FROM users
+      WHERE ranking BETWEEN ? AND ?
+      AND (name LIKE ? OR surname LIKE ? OR name LIKE ? OR surname LIKE ? )
+  `;
+
+  db.query(query, [minRanking, maxRanking, `%${searchQuery}%`, `%${searchQuery}%`, `%${searchQueryEn}%`, `%${searchQueryEn}%`], (err, results) => {
+      if (err) {
+          return res.status(500).json({ error: err.message });
+      }
+      res.json(results);
+  });
+});
 
 
 router.get("/:id", (req, res) => {

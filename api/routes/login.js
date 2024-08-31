@@ -63,7 +63,6 @@ router.post("/users/autologin", auth, (req, res) => {
     "SELECT * FROM users  WHERE email=? AND idusers=?",
     [req.decoded.email, req.decoded.id],
     (err, result) => {
-      console.log(result[0])
       if (err) {
         console.log(err);
       } else {
