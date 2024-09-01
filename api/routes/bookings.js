@@ -124,6 +124,7 @@ router.post('/finalcheck', auth, (req, res) => {
     team_a_player_a_name,team_a_player_b_name,team_b_player_a_name,team_b_player_b_name,
     team_a_player_a_surname,team_a_player_b_surname,team_b_player_a_surname,team_b_player_b_surname,
     team_a_player_a_added_by,team_a_player_b_added_by,team_b_player_a_added_by,team_b_player_b_added_by,
+    team_a_player_a_ranking,team_a_player_b_ranking,team_b_player_a_ranking,team_b_player_b_ranking,
     rated,typeOfBooking,level,indoor,court_name
   } = req.body;
 
@@ -194,6 +195,10 @@ router.post('/finalcheck', auth, (req, res) => {
       team_a_player_b_added_by : team_a_player_b_added_by,
       team_b_player_a_added_by : team_b_player_a_added_by,
       team_b_player_b_added_by : team_b_player_b_added_by,
+      team_a_player_a_ranking : team_a_player_a_ranking,
+      team_a_player_b_ranking : team_a_player_b_ranking,
+      team_b_player_a_ranking : team_b_player_a_ranking,
+      team_b_player_b_ranking : team_b_player_b_ranking,
       rated : rated,
       level : level,
       indoor : indoor,
@@ -223,7 +228,7 @@ router.post('/finalcheck', auth, (req, res) => {
 
 // Get All or Future Bookings with Optional Pagination
 router.get("/", (req, res) => {
-  const { future, status, userId, courtId, page, limit,sort, typeOfBooking, rated,date  } = req.query;
+  const { future, status, userId, courtId, page, limit,sort, typeOfBooking, rated,date,filled  } = req.query;
 
   // Base query
   let query = `SELECT * FROM bookings`;
@@ -278,8 +283,17 @@ if (rated && typeof date !== 'undefined' && rated.trim() !== "") {
     queryParams.push(date);
   }
 
-  // Exclude bookings with status 'temporary'
+ // Optional filled filter
+ if (filled === 'true') {
   query += future === 'true' || status || userId || courtId || typeOfBooking || rated || date ? ` AND` : ` WHERE`;
+  query += ` team_a_player_a IS NOT NULL AND team_a_player_b IS NOT NULL AND team_b_player_a IS NOT NULL AND team_b_player_b IS NOT NULL`;
+} else if (filled === 'false') {
+  query += future === 'true' || status || userId || courtId || typeOfBooking || rated || date ? ` AND` : ` WHERE`;
+  query += ` (team_a_player_a IS NULL OR team_a_player_b IS NULL OR team_b_player_a IS NULL OR team_b_player_b IS NULL)`;
+}
+
+  // Exclude bookings with status 'temporary'
+  query += future === 'true' || status || userId || courtId || typeOfBooking || rated || date || filled === 'true' ? ` AND` : ` WHERE`;
   query += ` status <> 'temporary'`;
 
   // Optional sorting logic
@@ -309,7 +323,30 @@ if (rated && typeof date !== 'undefined' && rated.trim() !== "") {
 });
 
 
-  
+// Get a Booking by idbookings
+router.get("/onebooking/:idbookings", (req, res) => {
+  const { idbookings } = req.params;
+
+  // SQL query to fetch the booking by idbookings
+  const query = `SELECT * FROM bookings WHERE idbookings = ?`;
+
+  // Execute the query
+  db.query(query, [idbookings], (err, results) => {
+    if (err) {
+      console.error('Error fetching booking:', err);
+      return res.status(500).json({ error: 'Database query failed' });
+    }
+
+    // Check if the booking was found
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    // Send the booking details as JSON
+    res.json(results[0]);
+  });
+});
+
   // Temporary booking expiration handler (e.g., a background job or cron job)
   const handleTemporaryBookingExpiration = () => {
     const cleanupQuery = `
