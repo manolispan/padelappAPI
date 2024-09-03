@@ -87,4 +87,21 @@ router.get("/timeslots", (req, res) => {
 
   
 
+  router.post("/getone/:iduser", auth, (req, res) => {
+    const iduser = req.params.iduser
+
+  
+    
+      db.query("SELECT * FROM rankings WHERE iduser=?",[iduser],(err,result)=>{
+      if (err) {
+          console.log(err)    }
+          else { 
+            
+              res.send(result)
+          }}
+      )
+    })
+    
+
+
 module.exports = router;

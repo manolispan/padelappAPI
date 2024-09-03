@@ -347,6 +347,36 @@ router.get("/onebooking/:idbookings", (req, res) => {
   });
 });
 
+
+// Get all bookings that include a specific player's idusers and have a score
+router.get("/player/:idusers", (req, res) => {
+  const { idusers } = req.params;
+
+  // SQL query to fetch bookings where the player is involved and the score is not NULL
+  const query = `
+    SELECT * FROM bookings 
+    WHERE score IS NOT NULL 
+    AND (
+      team_a_player_a = ? OR
+      team_a_player_b = ? OR
+      team_b_player_a = ? OR
+      team_b_player_b = ?
+    ) AND idbookings > 0
+  `;
+
+  // Execute the query with the player's idusers provided in four spots for each player position
+  db.query(query, [idusers, idusers, idusers, idusers], (err, results) => {
+    if (err) {
+      console.error('Error fetching bookings:', err);
+      return res.status(500).json({ error: 'Database query failed' });
+    }
+
+    // Return the bookings that match the criteria
+    res.json(results);
+  });
+});
+
+
   // Temporary booking expiration handler (e.g., a background job or cron job)
   const handleTemporaryBookingExpiration = () => {
     const cleanupQuery = `

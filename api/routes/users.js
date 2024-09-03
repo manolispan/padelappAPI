@@ -187,6 +187,29 @@ const upload = multer({
 
 
 
+// Get a Booking by idbookings
+router.get("/oneuser/:idusers", (req, res) => {
+  const { idusers } = req.params;
+
+  // SQL query to fetch the booking by idbookings
+  const query = `SELECT * FROM users WHERE idusers = ?`;
+
+  // Execute the query
+  db.query(query, [idusers], (err, results) => {
+    if (err) {
+      console.error('Error fetching booking:', err);
+      return res.status(500).json({ error: 'Database query failed' });
+    }
+
+    // Check if the booking was found
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    // Send the booking details as JSON
+    res.json(results[0]);
+  });
+});
 
 
 
