@@ -377,6 +377,72 @@ router.get("/player/:idusers", (req, res) => {
 });
 
 
+// Join team route with spot availability check
+router.post("/join/:idbookings", auth, (req, res) => {
+  const { idbookings } = req.params;
+  const { team, position,ranking,name,surname } = req.body; // Assume team is "A" or "B" and position is "a" or "b"
+  const idusers = req.decoded.id;
+
+
+
+
+
+  // Fetch the current booking and check if the spot is available
+  const queryCheck = `SELECT team_a_player_a, team_a_player_b, team_b_player_a, team_b_player_b FROM bookings WHERE idbookings = ?`;
+
+  db.query(queryCheck, [idbookings], (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database query failed' });
+    }
+
+    if (!results.length) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const booking = results[0];
+    let spotAvailable = false;
+
+    // Check if the selected spot is still available
+    if (team === "A" && position === "a" && !booking.team_a_player_a) {
+      spotAvailable = true;
+    } else if (team === "A" && position === "b" && !booking.team_a_player_b) {
+      spotAvailable = true;
+    } else if (team === "B" && position === "a" && !booking.team_b_player_a) {
+      spotAvailable = true;
+    } else if (team === "B" && position === "b" && !booking.team_b_player_b) {
+      spotAvailable = true;
+    }
+
+    // If the spot is already taken, return an error
+    if (!spotAvailable) {
+      return res.status(400).json({ error: 'Η θέση πλέον δεν είναι διαθέσιμη.' });
+    }
+
+    // If the spot is available, update the booking with the player
+    let updateQuery = "";
+    if (team === "A" && position === "a") {
+      updateQuery = `UPDATE bookings SET team_a_player_a = ?, team_a_player_a_name=? , team_a_player_a_surname=? , team_a_player_a_added_by=? , team_a_player_a_ranking=?  WHERE idbookings = ?`;
+    } else if (team === "A" && position === "b") {
+      updateQuery = `UPDATE bookings SET team_a_player_b = ? , team_a_player_b_name=? , team_a_player_b_surname=? , team_a_player_b_added_by=? , team_a_player_b_ranking=?  WHERE idbookings = ?`;
+    } else if (team === "B" && position === "a") {
+      updateQuery = `UPDATE bookings SET team_b_player_a = ? , team_b_player_a_name=? , team_b_player_a_surname=? , team_b_player_a_added_by=? , team_b_player_a_ranking=?  WHERE idbookings = ?`;
+    } else if (team === "B" && position === "b") {
+      updateQuery = `UPDATE bookings SET team_b_player_b = ? , team_b_player_b_name=? , team_b_player_b_surname=? , team_b_player_b_added_by=? , team_b_player_b_ranking=?  WHERE idbookings = ?`;
+    }
+
+    // Execute the update query to join the team
+    db.query(updateQuery, [idusers,name,surname,idusers,ranking, idbookings], (err, result) => {
+      if (err) {
+        return res.status(500).json({ error: 'Failed to join the team' });
+      }
+
+      return res.status(200).json({ success: 'Joined the team successfully' });
+    });
+  });
+});
+
+
+
   // Temporary booking expiration handler (e.g., a background job or cron job)
   const handleTemporaryBookingExpiration = () => {
     const cleanupQuery = `

@@ -60,7 +60,14 @@ const upload = multer({
   fileFilter:fileFilter
 
 }); */
+function formatDate(timestamp) {
+  const date = new Date(timestamp);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+  const year = date.getFullYear();
 
+  return `${year}-${month}-${day}`;
+}
 
 router.post("/", auth, (req, res) => {
 const iduser = req.decoded.id;
@@ -102,6 +109,47 @@ router.get("/timeslots", (req, res) => {
       )
     })
     
+    router.put("/changerating", auth, (req, res) => {
+     
+      console.log(req.body)
+ const date = Date.now();
+ const dateFormatted= formatDate(date)
+const rating=req.body.rating
+    
+      
+      db.query(
+          
+        "UPDATE users SET ranking=? WHERE idusers=?",
+        [rating,req.decoded.id],
+        (err, result) => {
+            /* console.log(req.body); */
+          if (err) {
+            console.log(err);
+          } else {
+            
+            db.query(
+          
+              "INSERT INTO rankings (iduser,rating,date) VALUES  (?,?,?)",
+              [req.decoded.id,rating,dateFormatted],
+              (err, result) => {
+                  /* console.log(req.body); */
+                if (err) {
+                  console.log(err);
+                } else {
+                  res.send("Values inserted");
+                }
+              }
+            );
 
+          }
+        }
+      );
+      
+    
+    
+    
+    
+    });
+    
 
 module.exports = router;

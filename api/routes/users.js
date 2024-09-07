@@ -132,6 +132,7 @@ const upload = multer({
     const age = req.body.age;
     const gender = req.body.gender
     const surname = req.body.surname
+    const hand = req.body.hand
     const registered_at = Date.now();
 
 
@@ -146,8 +147,8 @@ const upload = multer({
   }  
     db.query(
         
-      "INSERT INTO users (surname,gender,password,email,name,address,phone,photo,position,age,registered_at) VALUES  (?,?,?,?,?,?,?,?,?,?,?)",
-      [surname,gender,hash,email,name,address,phone,photo,position,age,registered_at],
+      "INSERT INTO users (hand,surname,gender,password,email,name,address,phone,photo,position,age,registered_at) VALUES  (?,?,?,?,?,?,?,?,?,?,?,?)",
+      [hand,surname,gender,hash,email,name,address,phone,photo,position,age,registered_at],
       (err, result) => {
           /* console.log(req.body); */
         if (err) { 
