@@ -441,7 +441,185 @@ router.post("/join/:idbookings", auth, (req, res) => {
   });
 });
 
+//remove yourself from booking
+router.post("/cancel/:idbookings", auth, (req, res) => {
+  const { idbookings } = req.params;
+  const { id } = req.decoded;
 
+  // Fetch the booking
+  const querySelect = `SELECT * FROM bookings WHERE idbookings = ?`;
+  
+  db.query(querySelect, [idbookings], (err, results) => {
+    if (err) return res.status(500).json({ error: 'Σφάλμα επικοινωνίας με τη βάση.' });
+
+    const booking = results[0];
+    if (!booking) {
+      return res.status(404).json({ error: "Δε βρέθηκε η κράτηση." });
+    }
+
+ 
+
+
+    // Get the current date and time
+    const now = new Date();
+
+    // Parse booking date and time
+    const bookingDate = new Date(booking.date); // e.g. 2024-03-22
+    const timeSlots = booking.time.split(','); // Split multiple slots, e.g. ['13.00-14.30', '14.30-16.00']
+    
+    // Get the first slot's start time
+    const firstSlot = timeSlots[0]; // '13.00-14.30'
+    const startTime = firstSlot.split('-')[0]; // '13.00'
+
+    // Combine the booking date with the start time
+    const [hours, minutes] = startTime.split(':').map(Number);
+    bookingDate.setHours(hours, minutes, 0, 0); // Set the booking date to the start time
+
+    // Check if the cancellation is at least 6 hours before the start time
+    const sixHoursBefore = new Date(bookingDate);
+    sixHoursBefore.setHours(bookingDate.getHours() - 6);
+
+    if (now > sixHoursBefore) {
+      return res.status(400).json({ error: "Η ακύρωση πρέπει να γίνει τουλάχιστον 6 ώρες πριν από την έναρξη." });
+    }
+
+
+    const { team_a_player_a, team_a_player_b, team_b_player_a,
+       team_b_player_b } = results[0];
+
+    if ((!team_a_player_a || team_a_player_a == id) 
+    && 
+    (!team_a_player_b || team_a_player_b == id)  
+  && (!team_b_player_a || team_b_player_a == id) 
+  && (!team_b_player_b || team_b_player_b == id) ) 
+  {
+      // If all are null, delete the booking
+      const queryDelete = `DELETE FROM bookings WHERE idbookings = ?`;
+      db.query(queryDelete, [idbookings], (err, result) => {
+        if (err) return res.status(500).json({ error: 'Σφάλμα διαγραφής της κράτησης.' });
+
+        return res.status(200).json({ success: true, message: 'Επιτυχής ακύρωση.' });
+      });
+    } 
+
+else {
+
+    let fieldsToUpdate = {};
+    
+ // Determine which player spot the user occupies
+ if (booking.team_a_player_a == id) {
+  fieldsToUpdate = {
+    team_a_player_a: null,
+    team_a_player_a_name: null,
+    team_a_player_a_surname: null,
+    team_a_player_a_ranking: null,
+    team_a_player_a_added_by: null
+  };
+} else if (booking.team_a_player_b == id) {
+  fieldsToUpdate = {
+    team_a_player_b: null,
+    team_a_player_b_name: null,
+    team_a_player_b_surname: null,
+    team_a_player_b_ranking: null,
+    team_a_player_b_added_by: null
+  };
+} else if (booking.team_b_player_a == id) {
+  fieldsToUpdate = {
+    team_b_player_a: null,
+    team_b_player_a_name: null,
+    team_b_player_a_surname: null,
+    team_b_player_a_ranking: null,
+    team_b_player_a_added_by: null
+  };
+} else if (booking.team_b_player_b == id) {
+  fieldsToUpdate = {
+    team_b_player_b: null,
+    team_b_player_b_name: null,
+    team_b_player_b_surname: null,
+    team_b_player_b_ranking: null,
+    team_b_player_b_added_by: null
+  };
+}  else {
+      return res.status(400).json({ error: "Δε βρέθηκε το όνομά σας στην κράτηση." });
+    }
+
+  // Build the query dynamically based on fieldsToUpdate
+  const fieldsToNullify = Object.keys(fieldsToUpdate).map(field => `${field} = NULL`).join(', ');
+  const queryUpdate = `UPDATE bookings SET ${fieldsToNullify} WHERE idbookings = ?`;
+
+
+    db.query(queryUpdate, [idbookings], (err, result) => {
+      if (err) return res.status(500).json({ error: 'Σφάλμα επικοινωνίας με τη βάση' });
+
+      res.status(200).json({ success: true, message: 'Επιτυχής ακύρωση' });
+    });}
+
+  });
+
+
+});
+
+
+//delelete booking
+router.post("/delete/:idbookings", auth, (req, res) => {
+  const { idbookings } = req.params;
+  const { id: userId } = req.decoded; // Get the userId of the logged-in user
+
+  // Fetch the booking
+  const querySelect = `SELECT * FROM bookings WHERE idbookings = ?`;
+  
+  db.query(querySelect, [idbookings], (err, results) => {
+    if (err) return res.status(500).json({ error: "Σφάλμα επικοινωνίας με τη βάση." });
+
+    const booking = results[0];
+    if (!booking) {
+      return res.status(404).json({ error: "Δε βρέθηκε η κράτηση." });
+    }
+
+    // Check if the logged-in user made the booking and if the booking is "Κλειστό"
+    if (booking.userId !== userId) {
+      return res.status(403).json({ error: "Δεν είστε ο δημιουργός της κράτησης." });
+    }
+
+    if (booking.typeOfBooking !== "Κλειστό") {
+      return res.status(403).json({ error: "Η κράτηση δεν είναι Κλειστή, δεν μπορείτε να την διαγράψετε." });
+    }
+
+    
+    // Get the current date and time
+    const now = new Date();
+
+    // Parse booking date and time
+    const bookingDate = new Date(booking.date); // e.g. 2024-03-22
+    const timeSlots = booking.time.split(','); // Split multiple slots, e.g. ['13.00-14.30', '14.30-16.00']
+    
+    // Get the first slot's start time
+    const firstSlot = timeSlots[0]; // '13.00-14.30'
+    const startTime = firstSlot.split('-')[0]; // '13.00'
+
+    // Combine the booking date with the start time
+    const [hours, minutes] = startTime.split(':').map(Number);
+    bookingDate.setHours(hours, minutes, 0, 0); // Set the booking date to the start time
+
+    // Check if the cancellation is at least 6 hours before the start time
+    const sixHoursBefore = new Date(bookingDate);
+    sixHoursBefore.setHours(bookingDate.getHours() - 6);
+
+    if (now > sixHoursBefore) {
+      return res.status(400).json({ error: "Η ακύρωση πρέπει να γίνει τουλάχιστον 6 ώρες πριν από την έναρξη." });
+    }
+
+
+    // If both conditions pass, delete the booking
+    const queryDelete = `DELETE FROM bookings WHERE idbookings = ?`;
+
+    db.query(queryDelete, [idbookings], (err, result) => {
+      if (err) return res.status(500).json({ error: "Σφάλμα επικοινωνίας με τη βάση." });
+
+      res.status(200).json({ success: true, message: "Η κράτηση διαγράφηκε επιτυχώς." });
+    });
+  });
+});
 
   // Temporary booking expiration handler (e.g., a background job or cron job)
   const handleTemporaryBookingExpiration = () => {
