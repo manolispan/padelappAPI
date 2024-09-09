@@ -376,6 +376,55 @@ router.get("/player/:idusers", (req, res) => {
   });
 });
 
+// Get all bookings that include a specific player's idusers and does not have a score
+router.post("/player/notscored", auth, (req, res) => {
+  const { id: idusers } = req.decoded;
+
+
+  // SQL query to fetch bookings where the player is involved and the score is not NULL
+  const query = `
+    SELECT * FROM bookings 
+    WHERE score IS NULL 
+    AND (
+      team_a_player_a = ? OR
+      team_a_player_b = ? OR
+      team_b_player_a = ? OR
+      team_b_player_b = ?
+    ) AND idbookings > 0 AND rated="Βαθμολογούμενο" `;
+
+  // Execute the query with the player's idusers provided in four spots for each player position
+  db.query(query, [idusers, idusers, idusers, idusers], (err, results) => {
+    if (err) {
+      console.error('Error fetching bookings:', err);
+      return res.status(500).json({ error: 'Database query failed' });
+    }
+
+    const now = new Date();
+    
+    // Filter bookings based on whether the current time has passed the last time slot's end time
+    const filteredResults = results.filter(booking => {
+      const bookingDate = new Date(booking.date); // e.g., '2024-03-22'
+      const timeSlots = booking.time.split(',');  // e.g., ['13:00-14:30', '14:30-16:00']
+
+      // Get the last time slot and extract the end time
+      const lastSlot = timeSlots[timeSlots.length - 1]; // e.g., '14:30-16:00'
+      const endTime = lastSlot.split('-')[1]; // '16:00'
+
+      // Parse the end time and combine it with the booking date
+      const [endHours, endMinutes] = endTime.split(':').map(Number);
+      bookingDate.setHours(endHours, endMinutes, 0, 0); // Set bookingDate to the end time
+
+      // Check if the current time is after the booking's end time
+      return now > bookingDate;
+    });
+
+    // Return the filtered results
+    res.json(filteredResults);
+  });
+});
+
+
+
 
 // Join team route with spot availability check
 router.post("/join/:idbookings", auth, (req, res) => {
@@ -620,6 +669,311 @@ router.post("/delete/:idbookings", auth, (req, res) => {
     });
   });
 });
+
+
+//add your score
+const getBookingById = (bookingId) => {
+  return new Promise((resolve, reject) => {
+    const query = `SELECT * FROM bookings WHERE idbookings = ?`;
+    db.query(query, [bookingId], (err, result) => {
+      if (err) {
+        return reject(err); // Handle database error
+      }
+      resolve(result[0]); // Return the first result
+    });
+  });
+};
+
+//submit team score
+router.post('/submitscore', auth, async (req, res) => {
+  const { bookingId, team, score } = req.body;
+  const { id } = req.decoded; 
+
+  // Validate required fields
+  if (!bookingId || !team || !score ) {
+    return res.status(400).json({ message: "Missing required fields." });
+  }
+
+  // Validate team value (must be 'a' or 'b')
+  if (team !== 'a' && team !== 'b') {
+    return res.status(400).json({ message: "Invalid team value." });
+  }
+
+  try {
+    // Retrieve the booking details to check player IDs
+    const booking = await getBookingById(bookingId);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found." });
+    }
+
+    // Check if the user is part of the team
+    const isPlayerInTeam = (team === 'a' && (id === booking.team_a_player_a || id === booking.team_a_player_b)) ||
+                           (team === 'b' && (id === booking.team_b_player_a || id === booking.team_b_player_b));
+
+    if (!isPlayerInTeam) {
+      return res.status(403).json({ message: "You are not authorized to update this score." });
+    }
+
+    // Depending on the team, update the respective score field in the bookings table
+    let updateField = '';
+    let updateField2 = '';
+    if (team === 'a') {
+      updateField = 'team_a_score'; // Update score for team A
+      updateField2 = 'team_a_winner'; 
+    } else if (team === 'b') {
+      updateField = 'team_b_score'; // Update score for team B
+      updateField2 = 'team_b_winner';
+    }
+
+    // Parse the scores from the sets
+    const sets = score.split(','); // e.g., ['6-4', '5-7', '7-6']
+    let teamAWins = 0;
+    let teamBWins = 0;
+
+    sets.forEach((set) => {
+      const [teamAScore, teamBScore] = set.split('-').map(Number);
+      if (teamAScore > teamBScore) {
+        teamAWins += 1;
+      } else {
+        teamBWins += 1;
+      } 
+    });
+
+    // Determine the winner
+    let winner = null;
+    if (teamAWins > teamBWins) {
+      winner = 'a';
+    } else if (teamBWins > teamAWins) {
+      winner = 'b';
+    } else {
+      winner = 'draw'; // In case of a draw (optional, based on your rules)
+    }
+
+
+
+   // Build and execute the query directly
+   const query = `UPDATE bookings SET ${updateField} = ?, ${updateField2} = ? WHERE idbookings = ?`;
+    
+    
+   db.query(query, [score,winner, bookingId], (err, result) => {
+    if (err) {
+      console.error("Error updating score:", err);
+      return res.status(500).json({ message: "Failed to update score" });
+    }
+
+    // Check if any row was updated
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Booking not found." });
+    }
+
+    res.status(200).json({ message: "Score updated successfully" });
+  });
+
+  } catch (error) {
+    console.error("Error updating score:", error);
+    res.status(500).json({ message: "Failed to update score" });
+  }
+});
+
+
+
+//accept score
+router.post('/acceptscore', auth, async (req, res) => {
+  const { bookingId, team, score } = req.body;
+  const { id } = req.decoded; 
+
+  // Validate required fields
+  if (!bookingId || !team || !score ) {
+    return res.status(400).json({ message: "Missing required fields." });
+  }
+
+  // Validate team value (must be 'a' or 'b')
+  if (team !== 'a' && team !== 'b') {
+    return res.status(400).json({ message: "Invalid team value." });
+  }
+
+  try {
+    // Retrieve the booking details to check player IDs
+    const booking = await getBookingById(bookingId);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found." });
+    }
+
+    // Check if the user is part of the team
+    const isPlayerInTeam = (team === 'a' && (id === booking.team_a_player_a || id === booking.team_a_player_b)) ||
+                           (team === 'b' && (id === booking.team_b_player_a || id === booking.team_b_player_b));
+
+    if (!isPlayerInTeam) {
+      return res.status(403).json({ message: "Δεν έχετε την άδεια να αλλάξετε το σκορ." });
+    }
+
+    // Depending on the team, update the respective score field in the bookings table
+    let updateField = '';
+    let updateField2 = '';
+ 
+    if (team === 'a') {
+      updateField = 'team_a_score'; // Update score for team A
+      updateField2 = 'team_a_winner'; 
+
+    } else if (team === 'b') {
+      updateField = 'team_b_score'; // Update score for team B
+      updateField2 = 'team_b_winner';
+ 
+    }
+
+
+    
+    // Parse the scores from the sets
+    const sets = score.split(','); // e.g., ['6-4', '5-7', '7-6']
+    let teamAWins = 0;
+    let teamBWins = 0;
+
+    sets.forEach((set) => {
+      const [teamAScore, teamBScore] = set.split('-').map(Number);
+      if (teamAScore > teamBScore) {
+        teamAWins += 1;
+      } else {
+        teamBWins += 1;
+      } 
+    });
+
+    // Determine the winner
+    let winner = null;
+    if (teamAWins > teamBWins) {
+      winner = 'a';
+    } else if (teamBWins > teamAWins) {
+      winner = 'b';
+    } else {
+      winner = 'draw'; // In case of a draw (optional, based on your rules)
+    }
+
+
+   // Build and execute the query directly
+   const query = `UPDATE bookings SET ${updateField} = ?, score = ?, ${updateField2} = ?, winner=? WHERE idbookings = ?`;
+    
+    
+   db.query(query, [score, score,winner,winner, bookingId], (err, result) => {
+    if (err) {
+      console.error("Error updating score:", err);
+      return res.status(500).json({ message: "Failed to update score" });
+    }
+
+    // Check if any row was updated
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Booking not found." });
+    }
+
+    res.status(200).json({ message: "Score updated successfully" });
+  });
+
+  } catch (error) {
+    console.error("Error updating score:", error);
+    res.status(500).json({ message: "Failed to update score" });
+  }
+});
+
+
+//decline and sumbit team score
+router.post('/declinescore', auth, async (req, res) => {
+  const { bookingId, team, score } = req.body;
+  const { id } = req.decoded; 
+
+  // Validate required fields
+  if (!bookingId || !team || !score ) {
+    return res.status(400).json({ message: "Missing required fields." });
+  }
+
+  // Validate team value (must be 'a' or 'b')
+  if (team !== 'a' && team !== 'b') {
+    return res.status(400).json({ message: "Invalid team value." });
+  }
+
+  try {
+    // Retrieve the booking details to check player IDs
+    const booking = await getBookingById(bookingId);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found." });
+    }
+
+    // Check if the user is part of the team
+    const isPlayerInTeam = (team === 'a' && (id === booking.team_a_player_a || id === booking.team_a_player_b)) ||
+                           (team === 'b' && (id === booking.team_b_player_a || id === booking.team_b_player_b));
+
+    if (!isPlayerInTeam) {
+      return res.status(403).json({ message: "You are not authorized to update this score." });
+    }
+
+    // Depending on the team, update the respective score field in the bookings table
+    let updateField = '';
+    let updateField2 = '';
+    if (team === 'a') {
+      updateField = 'team_a_score'; // Update score for team A
+      updateField2 = 'team_a_winner'; 
+    } else if (team === 'b') {
+      updateField = 'team_b_score'; // Update score for team B
+      updateField2 = 'team_b_winner';
+    }
+
+    // Parse the scores from the sets
+    const sets = score.split(','); // e.g., ['6-4', '5-7', '7-6']
+    let teamAWins = 0;
+    let teamBWins = 0;
+
+    sets.forEach((set) => {
+      const [teamAScore, teamBScore] = set.split('-').map(Number);
+      if (teamAScore > teamBScore) {
+        teamAWins += 1;
+      } else {
+        teamBWins += 1;
+      } 
+    });
+
+    // Determine the winner
+    let winner = null;
+    if (teamAWins > teamBWins) {
+      winner = 'a';
+    } else if (teamBWins > teamAWins) {
+      winner = 'b';
+    } else {
+      winner = 'draw'; // In case of a draw (optional, based on your rules)
+    }
+
+
+    let fieldsToNullify = '';
+    if (team == 'a') {
+      // If team A disputes, nullify team B's score and winner
+      fieldsToNullify = `team_b_score = NULL, team_b_winner = NULL`;
+    } else if (team == 'b') {
+      // If team B disputes, nullify team A's score and winner
+      fieldsToNullify = `team_a_score = NULL, team_a_winner = NULL`;
+    }
+
+
+   // Build and execute the query directly
+   const query = `UPDATE bookings SET ${updateField} = ?, ${updateField2} = ?,${fieldsToNullify} WHERE idbookings = ?`;
+    
+    
+   db.query(query, [score,winner, bookingId], (err, result) => {
+    if (err) {
+      console.error("Error updating score:", err);
+      return res.status(500).json({ message: "Failed to update score" });
+    }
+
+    // Check if any row was updated
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Booking not found." });
+    }
+
+    res.status(200).json({ message: "Score updated successfully" });
+  });
+
+  } catch (error) {
+    console.error("Error updating score:", error);
+    res.status(500).json({ message: "Failed to update score" });
+  }
+});
+
+
 
   // Temporary booking expiration handler (e.g., a background job or cron job)
   const handleTemporaryBookingExpiration = () => {
