@@ -10,7 +10,35 @@ const transport= require('../../nodemailer/nodemailertrans');
 const auth = require("../../middleware/auth");
 const logger =require("../../winston/logger");
 
+// Function to update ranking for a team
+const updateRankingForTeam = async (teamPlayers, teamRankings, increment) => {
+  for (let i = 0; i < teamPlayers.length; i++) {
+    const playerId = teamPlayers[i];
 
+    const rankingQuery = `SELECT ranking FROM users WHERE idusers = ?`;
+    const [rankingResult] = await db.promise().query(rankingQuery, [playerId]);
+    
+
+
+    console.log(rankingResult)
+    let currentRating = rankingResult[0].ranking;
+
+    /* let currentRating = teamRankings[i]; */
+
+    let newRating = parseFloat(parseFloat(currentRating) + parseFloat(increment)).toFixed(2);  // Ensure rating is a valid float, e.g., '3.50' or '3.51'
+
+    const today=Date.now()
+
+    // Update the ranking table
+    const insertRankingQuery = `INSERT INTO rankings (iduser, date, rating) VALUES (?, NOW(), ?)`;
+    await db.promise().query(insertRankingQuery, [playerId, newRating]);
+
+    // Update the user's ranking in the users table
+    const updateUserRankingQuery = `UPDATE users SET ranking = ? WHERE idusers = ?`;
+    await db.promise().query(updateUserRankingQuery, [newRating, playerId]);
+
+    }
+};
 
 
 router.post("/", auth, (req, res) => {
@@ -852,7 +880,7 @@ router.post('/acceptscore', auth, async (req, res) => {
    const query = `UPDATE bookings SET ${updateField} = ?, score = ?, ${updateField2} = ?, winner=? WHERE idbookings = ?`;
     
     
-   db.query(query, [score, score,winner,winner, bookingId], (err, result) => {
+   db.query(query, [score, score,winner,winner, bookingId], async (err, result) => {
     if (err) {
       console.error("Error updating score:", err);
       return res.status(500).json({ message: "Failed to update score" });
@@ -863,7 +891,46 @@ router.post('/acceptscore', auth, async (req, res) => {
       return res.status(404).json({ message: "Booking not found." });
     }
 
-    res.status(200).json({ message: "Score updated successfully" });
+
+    // Check if a winner or score is already set to avoid double posting
+    if (booking.winner || booking.score) {
+      return res.status(409).json({ message: "Έχει γίνει ήδη αποδοχή του σκορ." });
+    }
+
+
+      // Fetch rankings for both teams from the booking table
+      const teamAPlayersRankings = [booking.team_a_player_a_ranking, booking.team_a_player_b_ranking];
+      const teamBPlayersRankings = [booking.team_b_player_a_ranking, booking.team_b_player_b_ranking];
+
+      // Get the respective player IDs
+      const teamAPlayers = [booking.team_a_player_a, booking.team_a_player_b];
+      const teamBPlayers = [booking.team_b_player_a, booking.team_b_player_b];
+
+      // Determine which team is the winner and loser
+      let winningTeam = null;
+      let losingTeam = null;
+      let winningTeamRankings = null;
+      let losingTeamRankings = null;
+
+      if (winner === 'a') {
+        winningTeam = teamAPlayers;
+        losingTeam = teamBPlayers;
+        winningTeamRankings = teamAPlayersRankings;
+        losingTeamRankings = teamBPlayersRankings;
+      } else if (winner === 'b') {
+        winningTeam = teamBPlayers;
+        losingTeam = teamAPlayers;
+        winningTeamRankings = teamBPlayersRankings;
+        losingTeamRankings = teamAPlayersRankings;
+      }
+
+
+      // Update rankings for winning and losing teams
+      await updateRankingForTeam(winningTeam, winningTeamRankings, 0.1);  // Increase ranking of winning team by 0.1
+      await updateRankingForTeam(losingTeam, losingTeamRankings, -0.1); // Decrease ranking of losing team by 0.1
+
+    res.status(200).json({ message: "Score and rankings updated successfully" });
+  
   });
 
   } catch (error) {
